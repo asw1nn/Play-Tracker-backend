@@ -4,12 +4,37 @@ const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
+// Save a new workout
+const { generateWorkout } = require('../lib/workoutGenerator');
+
+// Generate a workout plan (Public endpoint)
+router.post('/generate', async (req, res) => {
+    try {
+        const { energyLevel, targetMuscles, duration, goal } = req.body;
+
+        if (!energyLevel || !targetMuscles || !duration || !goal) {
+            return res.status(400).json({ error: 'Missing required parameters' });
+        }
+
+        const workoutPlan = generateWorkout({
+            energyLevel,
+            targetMuscles,
+            duration,
+            goal
+        });
+
+        res.json(workoutPlan);
+    } catch (error) {
+        console.error('Workout generation error:', error);
+        res.status(500).json({ error: 'Failed to generate workout' });
+    }
+});
+
 // All workout routes require authentication
 router.use(authenticateToken);
 
-// Save a new workout
 router.post('/', async (req, res) => {
-    const { date, exercises } = req.body;
+    const { date, exercises, name } = req.body;
     const userId = req.user.userId;
 
     if (!date || !exercises) {
@@ -18,10 +43,10 @@ router.post('/', async (req, res) => {
 
     try {
         const result = await pool.query(
-            `INSERT INTO workouts (user_id, workout_date, exercises) 
-             VALUES ($1, $2, $3) 
+            `INSERT INTO workouts (user_id, workout_date, exercises, name) 
+             VALUES ($1, $2, $3, $4) 
              RETURNING *`,
-            [userId, date, JSON.stringify(exercises)]
+            [userId, date, JSON.stringify(exercises), name || 'Workout Session']
         );
 
         res.status(201).json({
@@ -30,6 +55,7 @@ router.post('/', async (req, res) => {
                 id: result.rows[0].id,
                 date: result.rows[0].workout_date,
                 exercises: result.rows[0].exercises,
+                name: result.rows[0].name,
                 createdAt: result.rows[0].created_at
             }
         });
@@ -45,7 +71,7 @@ router.get('/', async (req, res) => {
 
     try {
         const result = await pool.query(
-            `SELECT id, workout_date as date, exercises, created_at 
+            `SELECT id, workout_date as date, exercises, name, created_at 
              FROM workouts 
              WHERE user_id = $1 
              ORDER BY workout_date DESC`,
@@ -57,6 +83,7 @@ router.get('/', async (req, res) => {
                 id: row.id,
                 date: row.date,
                 exercises: row.exercises,
+                name: row.name,
                 createdAt: row.created_at
             }))
         });
@@ -73,7 +100,7 @@ router.get('/:id', async (req, res) => {
 
     try {
         const result = await pool.query(
-            `SELECT id, workout_date as date, exercises, created_at 
+            `SELECT id, workout_date as date, exercises, name, created_at 
              FROM workouts 
              WHERE id = $1 AND user_id = $2`,
             [workoutId, userId]
@@ -88,6 +115,7 @@ router.get('/:id', async (req, res) => {
                 id: result.rows[0].id,
                 date: result.rows[0].date,
                 exercises: result.rows[0].exercises,
+                name: result.rows[0].name,
                 createdAt: result.rows[0].created_at
             }
         });
@@ -141,9 +169,9 @@ router.post('/migrate', async (req, res) => {
         let migratedCount = 0;
         for (const workout of history) {
             await client.query(
-                `INSERT INTO workouts (user_id, workout_date, exercises) 
-                 VALUES ($1, $2, $3)`,
-                [userId, workout.date, JSON.stringify(workout.exercises)]
+                `INSERT INTO workouts (user_id, workout_date, exercises, name) 
+                 VALUES ($1, $2, $3, $4)`,
+                [userId, workout.date, JSON.stringify(workout.exercises), workout.name || 'Workout Session']
             );
             migratedCount++;
         }

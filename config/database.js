@@ -30,13 +30,23 @@ async function initializeDatabase() {
     try {
         const fs = require('fs');
         const path = require('path');
-        const migrationSQL = fs.readFileSync(
-            path.join(__dirname, '../migrations/001_init.sql'),
-            'utf8'
-        );
+        const migrationsDir = path.join(__dirname, '../migrations');
 
-        await client.query(migrationSQL);
-        console.log('✅ Database schema initialized successfully');
+        // Read all files in migrations directory
+        const files = fs.readdirSync(migrationsDir)
+            .filter(file => file.endsWith('.sql'))
+            .sort(); // Ensure they run in order
+
+        for (const file of files) {
+            console.log(`Executing migration: ${file}`);
+            const migrationSQL = fs.readFileSync(
+                path.join(migrationsDir, file),
+                'utf8'
+            );
+            await client.query(migrationSQL);
+        }
+
+        console.log('✅ All database migrations executed successfully');
     } catch (error) {
         console.error('❌ Error initializing database:', error);
         throw error;
