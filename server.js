@@ -10,11 +10,19 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
+const configuredOrigins = (process.env.FRONTEND_URL || process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+const allowedOrigins = process.env.NODE_ENV === 'production'
+    ? configuredOrigins
+    : [...configuredOrigins, 'http://localhost:3000', 'http://localhost:3001'];
+
 app.use(cors({
-    origin: ['http://localhost:3000', 'http://localhost:3001', 'https://your-vercel-app.vercel.app'],
+    origin: allowedOrigins,
     credentials: true
 }));
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 
 // Request logging
 app.use((req, res, next) => {
@@ -34,6 +42,10 @@ app.get('/', (req, res) => {
     });
 });
 
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok' });
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/workouts', workoutRoutes);
 
@@ -51,6 +63,13 @@ app.use((req, res) => {
 // Initialize database and start server
 async function startServer() {
     try {
+        if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+            throw new Error('JWT_SECRET must be configured with at least 32 characters');
+        }
+        if (process.env.NODE_ENV === 'production' && allowedOrigins.length === 0) {
+            throw new Error('FRONTEND_URL must be configured in production');
+        }
+
         await initializeDatabase();
         app.listen(PORT, () => {
             console.log(`🚀 Server running on port ${PORT}`);

@@ -20,6 +20,8 @@ npm install
 2. Configure environment variables:
    - Copy `.env.example` to `.env`
    - Update with your PostgreSQL credentials
+   - Set `JWT_SECRET` to a random value with at least 32 characters
+   - Set `FRONTEND_URL` to the exact origin of the deployed frontend
 
 3. Run the server:
 ```bash
@@ -27,6 +29,7 @@ npm start
 ```
 
 The server will initialize the database schema automatically on first run.
+The `/health` endpoint is available for hosting-provider health checks.
 
 ## API Endpoints
 
@@ -50,12 +53,11 @@ The server will initialize the database schema automatically on first run.
 3. Add environment variables from `.env`
 4. Deploy
 
-### Render
-1. Create new Web Service on Render.com
-2. Connect GitHub repository
-3. Add environment variables from `.env`
-4. Deploy
+### Render demo deployment
+1. Create a Blueprint from this repository; Render reads `render.yaml` and configures the service.
+2. Provide the requested Supabase database connection values and the frontend's Vercel URL when prompted. Render generates `JWT_SECRET`.
+3. Deploy, then set `NEXT_PUBLIC_API_URL` in Vercel to `https://<render-service-host>/api` and redeploy the frontend.
 
 ## Environment Variables
 
-See `.env.example` for required variables.
+See `.env.example` for required variables. Never commit `.env` or place production secrets in source control.
